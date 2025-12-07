@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NYE 2026/27 Group Vote • KZN South Coast</title>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --card-bg: rgba(255,255,255,0.12);
+            --shadow: 0 8px 32px rgba(0,0,0,0.2);
+            --accent: #ff7e5f;
+            --text: linear-gradient(135deg, #ff7e5f, #feb47b);
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: var(--bg-gradient);
+            color: #fff;
+            min-height: 100vh;
+            max-width: 600px;
+            margin: 0 auto;
+            padding-bottom: 100px;
+        }
+        header {
+            text-align: center;
+            padding: 25px 15px;
+            background: rgba(0,0,0,0.3);
+        }
+        h1 { font-size: 2em; margin-bottom: 8px; }
+        .subtitle { opacity: 0.9; font-size: 1.1em; }
+        .destinations { padding: 20px; display: grid; gap: 25px; }
+        .card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow);
+        }
+        .card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 15px;
+            loading: lazy;
+        }
+        .card h2 { margin: 12px 0 8px; font-size: 1.6em; }
+        .card p { margin: 8px 0; line-height: 1.5; }
+        .card ul { padding-left: 20px; margin: 10px 0; }
+        .card li { margin: 6px 0; }
+        .pros li::marker { content: "Positive "; }
+        .cons li::marker { content: "Warning "; }
+        .vote-btn {
+            width: 100%;
+            padding: 18px;
+            margin-top: 15px;
+            background: var(--accent);
+            background: linear-gradient(135deg, #ff7e5f, #feb47b);
+            border: none;
+            border-radius: 50px;
+            color: white;
+            font-size: 1.3em;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .vote-btn.voted { background: #666; cursor: not-allowed; }
+        #results {
+            margin: 20px;
+            padding: 20px;
+            background: rgba(0,0,0,0.25);
+            border-radius: 20px;
+        }
+        .progress-bar {
+            height: 22px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 11px;
+            overflow: hidden;
+            margin: 12px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ff7e5f, #feb47b);
+            transition: width 0.6s ease;
+        }
+        .share-section {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+            text-align: center;
+        }
+        .whatsapp-btn {
+            display: inline-block;
+            padding: 16px 32px;
+            background: #25D366;
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        #confetti-canvas { position: fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1000; }
+        #confirmation {
+            position: fixed;
+            top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 2000;
+            text-align: center;
+            padding: 20px;
+        }
+        #confirmation h2 { font-size: 3em; margin-bottom: 20px; }
+        #close-confirm {
+            margin-top: 20px;
+            padding: 12px 30px;
+            background: var(--accent);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-size: 1.2em;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>NYE 2026/27 Group Vote</h1>
+        <p class="subtitle">7–10 people • 31 Dec 2026 – 2 Jan 2027 • KZN South Coast<br>R1400–R1700 pp (2 nights + food/drinks)</p>
+    </header>
+
+    <section class="destinations" id="destinations"></section>
+
+    <section id="results">
+        <h2>Live Results</h2>
+        <div id="progress-container"></div>
+    </section>
+
+    <section class="share-section">
+        <p>Send to the group — let everyone vote!</p>
+        <a href="#" id="whatsapp-share" class="whatsapp-btn">WhatsApp the Group</a>
+    </section>
+
+    <canvas id="confetti-canvas"></canvas>
+    <div id="confirmation">
+        <h2>Vote Received!</h2>
+        <p>Thank you — watch the results update live!</p>
+        <button id="close-confirm">Close</button>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = {
+          apiKey: "AIzaSyATZipoJembfjyTrvay0XeGDeOoMXpwyIg",
+          authDomain: "kzn-nye25.firebaseapp.com",
+          projectId: "kzn-nye25",
+          storageBucket: "kzn-nye25.firebasestorage.app",
+          messagingSenderId: "644646652528",
+          appId: "1:644646652528:web:0312c427dfe3d10f2f42b5"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const votesRef = ref(db, 'votes');
+
+        let votes = {};
+        let totalVotes = 0;
+
+        onValue(votesRef, (snapshot) => {
+            votes = snapshot.val() || {};
+            totalVotes = Object.values(votes).filter(v => v).length;
+            updateResults();
+        });
+
+        const destinations = [
+            {
+                id: "mantis-moon",
+                name: "Mantis & Moon Backpackers",
+                location: "Umzumbe",
+                cost: "R1400–R1600 pp",
+                vibe: "Jungle surf paradise — waves, jungle bar, wild adult energy",
+                events: "NYE Jungle Party • DJs • bonfire • midnight fireworks • R50 cover • dancing till sunrise",
+                image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600",
+                type: "Backpacker lodge + cabins",
+                sleeping: "Private rooms + family cabins (7–10 people)",
+                energy: "High",
+                beach: "5-min walk",
+                amenities: "Pool • hot tub • bar • Wi-Fi • braai • yoga deck",
+                pros: ["Insane jungle vibe", "Great bar & social scene", "Hot tub nights", "Surf lessons available", "Very group-friendly"],
+                cons: ["Can be loud", "Wildlife in rooms", "Basic dorms if not upgraded"],
+                fun: "Perfect mix of party hard (bar, DJs, shots) and chill (yoga, jacuzzi, beach days). Top pick for a rowdy, fun-loving group.",
+                booking: "https://mantisandmoon.net"
+            },
+            {
+                id: "spot-backpackers",
+                name: "The Spot Backpackers",
+                location: "Margate",
+                cost: "R1300–R1500 pp",
+                vibe: "Classic beachfront hostel — sun, sea, cheap drinks",
+                events: "NYE beach party spillover • free street party • ocean fireworks • bars open till late",
+                image: "https://images.unsplash.com/photo-1519046904884-53103b34b206?w=600",
+                type: "Hostel + log cabins",
+                sleeping: "Cabins + private rooms (7–10 people)",
+                energy: "Medium-High",
+                beach: "Direct access",
+                amenities: "Bar • kitchen • braai • sea views",
+                pros: ["Right on the beach", "Cheapest option", "Easy walk to nightlife"],
+                cons: ["Basic facilities", "Shared bathrooms in some units"],
+                fun: "Endless beach days → braai → hit Margate nightlife. Great if the group loves cheap & cheerful.",
+                booking: "https://thespotbackpackers.com"
+            },
+            {
+                id: "umkobi",
+                name: "Umkobi Lodge",
+                location: "Southbroom",
+                cost: "R1450–R1650 pp",
+                vibe: "Peaceful lagoon & ocean views — perfect balance",
+                events: "NYE sunset party • live band • fireworks over lagoon • R100 cover",
+                image: "https://images.unsplash.com/photo-1571003118755-17e458abfb60?w=600",
+                type: "Log cabins / guesthouse",
+                sleeping: "3-bed house (sleeps 8)",
+                energy: "Medium",
+                beach: "10-min walk or lagoon",
+                amenities: "Pool • braai • en-suite rooms • secure",
+                pros: ["Stunning views", "Quiet & safe", "Great for braai nights"],
+                cons: ["Not walking distance to big parties", "Limited bar"],
+                fun: "Kayak the lagoon, braai, wine — then Uber to Ramsgate parties if you want to go hard.",
+                booking: "Airbnb or direct"
+            },
+            {
+                id: "santorini",
+                name: "Santorini Village",
+                location: "Ramsgate",
+                cost: "R1500–R1700 pp",
+                vibe: "Greek-island feels on the South Coast — sunsets & cocktails",
+                events: "Big Ramsgate beach NYE party right below • DJs • fireworks • R150 cover",
+                image: "https://images.unsplash.com/photo-1533929736458-ca588d08c8be?w=600",
+                type: "Self-catering apartments",
+                sleeping: "Multiple 3-bed units (6–10 people)",
+                energy: "High",
+                beach: "Direct beachfront",
+                amenities: "Pool • balconies • braai • garage",
+                pros: ["Best views", "Modern", "Walk to everything"],
+                cons: ["Peak-season premium price"],
+                fun: "Balcony sundowners → straight down to the beach party. Ideal for groups who love comfort + nightlife.",
+                booking: "Booking.com or direct"
+            },
+            {
+                id: "happy-wanderers",
+                name: "Happy Wanderers Resort",
+                location: "Illovo",
+                cost: "R1400–R1600 pp",
+                vibe: "Full holiday resort — beachfront, bar, restaurant",
+                events: "Resort NYE party • live music • fireworks • bar open late • R75–R100 cover",
+                image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600",
+                type: "Resort cabins + apartments",
+                sleeping: "4-bed units (8–10 people)",
+                energy: "High",
+                beach: "Direct access",
+                amenities: "Restaurant • bar • pools • shop",
+                pros: ["Everything on site", "Great for big groups", "Restaurant if you don’t want to cook"],
+                cons: ["Monkeys", "Can be busy"],
+                fun: "Classic South Coast resort vibes — pool, bar, beach, party on site. Zero driving needed.",
+                booking: "happywanderers.co.za"
+            },
+            {
+                id: "cutty-sark",
+                name: "Cutty Sark Hotel",
+                location: "Scottburgh",
+                cost: "R1350–R1550 pp",
+                vibe: "Hotel comfort with ocean views & scuba centre",
+                events: "Hotel NYE gala • DJ • buffet • fireworks • optional scuba countdown",
+                image: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?w=600",
+                type: "Hotel rooms",
+                sleeping: "Multiple ocean-view rooms (7–10 people)",
+                energy: "Medium-High",
+                beach: "Main beach",
+                amenities: "Pool • restaurant • bar • scuba centre",
+                pros: ["Hotel beds & service", "Scuba on site", "Walk to town"],
+                cons: ["Less “house party” feel"],
+                fun: "Comfort + adventure. Great if some people want hotel luxury and others want to party.",
+                booking: "premierhotels.co.za/cutty-sark"
+            }
+        ];
+
+        const container = document.getElementById('destinations');
+        destinations.forEach(d => {
+            const pros = d.pros.map(p => `<li>${p}</li>`).join('');
+            const cons = d.cons.map(c => `<li>${c}</li>`).join('');
+            container.innerHTML += `
+                <div class="card">
+                    <img src="${d.image}" alt="${d.name}">
+                    <h2>${d.name}<br><small>${d.location}</small></h2>
+                    <p><strong>${d.cost}</strong> • ${d.vibe}</p>
+                    <p><strong>NYE:</strong> ${d.events}</p>
+                    <p>Accomm: ${d.type} • Sleeps: ${d.sleeping} • Energy: ${d.energy} • Beach: ${d.beach}</p>
+                    <p>Amenities: ${d.amenities}</p>
+                    <ul class="pros"><strong>Pros</strong>${pros}</ul>
+                    <ul class="cons"><strong>Cons</strong>${cons}</ul>
+                    <p><strong>Fun factor:</strong> ${d.fun}</p>
+                    <p>Booking: <a href="${d.booking}" style="color:#4ecdc4">${d.booking.replace('https://','').split('/')[0]}</a></p>
+                    <button class="vote-btn" data-id="${d.id}">Vote ${d.name}</button>
+                </div>`;
+        });
+
+        document.addEventListener('click', async e => {
+            if (e.target.classList.contains('vote-btn')) {
+                if (localStorage.getItem('nye-voted')) {
+                    alert('One vote per person — thank you!');
+                    return;
+                }
+                const id = e.target.dataset.id;
+                await set(ref(db, 'votes/' + Date.now()), id);
+                localStorage.setItem('nye-voted', 'true');
+                e.target.textContent = 'Voted!';
+                e.target.classList.add('voted');
+                confettiExplosion();
+                document.getElementById('confirmation').style.display = 'flex';
+            }
+            if (e.target.id === 'close-confirm') {
+                document.getElementById('confirmation').style.display = 'none';
+            }
+        });
+
+        function updateResults() {
+            const c = document.getElementById('progress-container');
+            c.innerHTML = '';
+            destinations.forEach(d => {
+                const count = Object.values(votes).filter(v => v === d.id).length;
+                const pct = totalVotes ? Math.round(count / totalVotes * 100) : 0;
+                c.innerHTML += `
+                    <p><strong>${d.name}</strong> — ${count} votes</p>
+                    <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+                `;
+            });
+        }
+
+        document.getElementById('whatsapp-share').onclick = e => {
+            e.preventDefault();
+            const url = location.href;
+            const text = `Vote for our NYE 2026/27 KZN trip! 7–10 people, beaches, parties & good times ➜ ${url}`;
+            open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        };
+
+        function confettiExplosion() {
+            const canvas = document.getElementById('confetti-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = innerWidth;
+            canvas.height = innerHeight;
+            const confetti = [];
+            for(let i=0; i<150; i++){
+                confetti.push({
+                    x: Math.random()*canvas.width,
+                    y: Math.random()*canvas.height - canvas.height,
+                    r: Math.random()*4 + 3,
+                    d: Math.random()*8 + 4,
+                    color: `hsl(${Math.random()*360},70%,60%)`,
+                    tilt: Math.random()*10 - 10,
+                    tiltAngle: 0
+                });
+            }
+            function draw(){
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                confetti.forEach((c,i)=>{
+                    c.tiltAngle += 0.1;
+                    c.y += c.d;
+                    c.tilt = Math.sin(c.tiltAngle) * 15;
+                    if(c.y > canvas.height) confetti.splice(i,1);
+                    ctx.fillStyle = c.color;
+                    ctx.fillRect(c.x + c.tilt, c.y, c.r*2, c.r*2);
+                });
+                if(confetti.length) requestAnimationFrame(draw);
+            }
+            draw();
+        }
+
+        updateResults();
+    </script>
+</body>
+</html>
